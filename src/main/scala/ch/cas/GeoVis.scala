@@ -16,7 +16,7 @@ import ch.ninecode.model._
 class GeoVis extends Serializable
 {
   
-  case class SpezificAcLineSegment(id: String, name: String, aliasName: String, location: String)
+  case class SpezificAcLineSegment(id: String, name: String, aliasName: String, location: String, baseVoltage: String)
   case class BBox(xmin: Double, ymin: Double, xmax: Double, ymax: Double)
   
   
@@ -44,10 +44,10 @@ class GeoVis extends Serializable
     val positionPoint = get (sc, "PositionPoint").asInstanceOf[RDD[PositionPoint]]
     val acLineSegment = get (sc, "ACLineSegment").asInstanceOf[RDD[ACLineSegment]]
     
-    val line = acLineSegment.map((line: ACLineSegment) => { SpezificAcLineSegment (line.sup.sup.sup.sup.sup.mRID, line.sup.sup.sup.sup.sup.name, line.sup.sup.sup.sup.sup.aliasName, line.sup.sup.sup.sup.Location) })
+    val line = acLineSegment.map((line: ACLineSegment) => { SpezificAcLineSegment (line.sup.sup.sup.sup.sup.mRID, line.sup.sup.sup.sup.sup.name, line.sup.sup.sup.sup.sup.aliasName, line.sup.sup.sup.sup.Location, line.sup.sup.BaseVoltage) })
     val filteredOrderedPositions = preparePositionPoints(positionPoint, bbox)
  
-    val lines = line.keyBy(_.location).join(filteredOrderedPositions)
+    val lines = line.keyBy(_.location).join(filteredOrderedPositions) 
     
     val ppDf = sqlContext.createDataFrame (lines.values)
     return ppDf
@@ -66,9 +66,11 @@ class GeoVis extends Serializable
        xPos.toDouble <= bbox.xmax && 
        yPos.toDouble <= bbox.ymax)
     })
+    
+    val orderedPoints = filteredPoints.sortBy(_.sequenceNumber);
       
-    val groupedPoints = filteredPoints.map((pp: PositionPoint) => (pp.Location, (pp.sequenceNumber, pp.xPosition, pp.yPosition)))
-                                      .groupByKey()
+    val groupedPoints = orderedPoints.map((pp: PositionPoint) => (pp.Location, (pp.sequenceNumber, pp.xPosition, pp.yPosition)))
+                                     .groupByKey()
        
     val flattenPoints = groupedPoints.mapValues(value => 
       {
